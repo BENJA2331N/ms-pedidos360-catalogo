@@ -2,8 +2,10 @@ package com.pedidos360.catalog.service;
 
 import com.pedidos360.catalog.dto.ProductRequestDTO;
 import com.pedidos360.catalog.dto.ProductResponseDTO;
+import com.pedidos360.catalog.dto.StockUpdateDTO;
 import com.pedidos360.catalog.exception.InsufficientStockException;
 import com.pedidos360.catalog.exception.ProductNotFoundException;
+import com.pedidos360.catalog.messaging.producer.CatalogStockProducer;
 import com.pedidos360.catalog.model.Product;
 import com.pedidos360.catalog.repository.ProductRepository;
 import org.springframework.stereotype.Service;
@@ -16,9 +18,11 @@ import java.util.List;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final CatalogStockProducer catalogStockProducer;
 
-    public ProductService(ProductRepository productRepository) {
+    public ProductService(ProductRepository productRepository, CatalogStockProducer catalogStockProducer) {
         this.productRepository = productRepository;
+        this.catalogStockProducer = catalogStockProducer;
     }
 
     @Transactional(readOnly = true)
@@ -84,5 +88,8 @@ public class ProductService {
 
         product.setStock(product.getStock() - cantidad);
         productRepository.save(product);
+
+        // Evento asíncrono de stock (consumido por CatalogStockConsumer; no afecta la lógica si RabbitMQ falla)
+        catalogStockProducer.publicarEventoStock(new StockUpdateDTO(cantidad));
     }
 }

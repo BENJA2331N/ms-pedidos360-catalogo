@@ -7,6 +7,21 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Configuración de RabbitMQ del dominio "catálogo / stock". Todos los nombres se leen de application.yml
+ * (app.rabbitmq.catalogo.*); aquí solo se declaran los beans, sin lógica de negocio.
+ *
+ * <pre>
+ * Caso de uso: evento de actualización de stock (descuento al aceptar una orden)
+ *
+ *   CatalogStockProducer --routing-key--> [catalogo.exchange (direct)] --binding--> [catalogo.stock.queue]
+ *                                                                                    |  (NACK sin requeue / rechazo)
+ *                                                                                    v  x-dead-letter-exchange + routing key
+ *                                         [catalogo.dlx (direct)] --binding--> [catalogo.stock.dlq]
+ *
+ *   Consumidor: CatalogStockConsumer (cola principal con ACK manual y listener de la DLQ con logs)
+ * </pre>
+ */
 @Configuration
 public class RabbitMQConfig {
 
