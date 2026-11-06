@@ -8,18 +8,21 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Configuración de RabbitMQ del dominio "catálogo / stock". Todos los nombres se leen de application.yml
- * (app.rabbitmq.catalogo.*); aquí solo se declaran los beans, sin lógica de negocio.
+ * Configuración centralizada de RabbitMQ para el dominio funcional de Inventario / Stock.
+ * Todos los nombres de exchanges, colas y routing keys se inyectan desde application.yml
+ * (app.rabbitmq.catalogo.*), manteniendo cero strings acoplados y separando la infraestructura
+ * de la lógica de negocio.
  *
  * <pre>
- * Caso de uso: evento de actualización de stock (descuento al aceptar una orden)
+ * Caso de uso: Auditoría y alertas asíncronas de actualización de stock
  *
  *   CatalogStockProducer --routing-key--> [catalogo.exchange (direct)] --binding--> [catalogo.stock.queue]
- *                                                                                    |  (NACK sin requeue / rechazo)
- *                                                                                    v  x-dead-letter-exchange + routing key
- *                                         [catalogo.dlx (direct)] --binding--> [catalogo.stock.dlq]
+ *                                                                                     |  (NACK requeue=false)
+ *                                                                                     v  dead-letter-exchange + key
+ *                                         [catalogo.dlx (direct)] -----binding----> [catalogo.stock.dlq]
  *
- *   Consumidor: CatalogStockConsumer (cola principal con ACK manual y listener de la DLQ con logs)
+ *   Consumidor principal : messaging.inventario.CatalogStockConsumer (ACK manual, reintento y envío a DLQ)
+ *   Consumidor DLQ       : messaging.inventario.CatalogStockDlqConsumer (registro en logs y ACK)
  * </pre>
  */
 @Configuration
@@ -68,8 +71,8 @@ public class RabbitMQConfig {
     @Bean
     public Queue catalogoQueue() {
         return QueueBuilder.durable(catalogoQueue)
-                .withArgument("x-dead-letter-exchange", dlxExchange)
-                .withArgument("x-dead-letter-routing-key", dlqRoutingKey)
+                .deadLetterExchange(dlxExchange)
+                .deadLetterRoutingKey(dlqRoutingKey)
                 .build();
     }
 

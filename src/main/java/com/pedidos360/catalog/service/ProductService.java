@@ -87,9 +87,14 @@ public class ProductService {
         }
 
         product.setStock(product.getStock() - cantidad);
-        productRepository.save(product);
+        Product saved = productRepository.save(product);
 
-        // Evento asíncrono de stock (consumido por CatalogStockConsumer; no afecta la lógica si RabbitMQ falla)
-        catalogStockProducer.publicarEventoStock(new StockUpdateDTO(cantidad));
+        // Evento asíncrono de inventario/stock (desacoplado: no afecta la lógica si RabbitMQ falla)
+        catalogStockProducer.publicarEventoStock(new StockUpdateDTO(
+                saved.getId(),
+                saved.getNombre(),
+                cantidad,
+                saved.getStock()
+        ));
     }
 }
